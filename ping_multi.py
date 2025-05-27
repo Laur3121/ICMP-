@@ -111,7 +111,7 @@ def print_results(results, total_success, total_failure):
 
     
 async def main():
-    hosts = ["8.8.8.8", "1.1.1.1","127.0.0.1","104.244.42.66","208.67.222.222"]
+    hosts = ["8.8.8.8", "1.1.1.1","127.0.0.1","104.244.42.66","208.67.222.222","192.0.0.2","133.111.1212.111"]
     results, total_success, total_failure = await ping_multiple_hosts(hosts)
     print_results(results, total_success, total_failure)
 
