@@ -7,6 +7,8 @@ import os
 import select
 import signal
 from collections import deque, OrderedDict
+from datetime import datetime
+import ipaddress
 
 # --- ICMPユーティリティ関数 ---
 def checksum(data):
@@ -19,21 +21,30 @@ def checksum(data):
     s += s >> 16
     return ~s & 0xffff
 
-def create_icmp_packet(ident, seq):
-    header = struct.pack('!BBHHH', 8, 0, 0, ident, seq)
+def create_icmp_packet(ident, seq, ipv6=False):
+    if ipv6:
+        header = struct.pack('!BbHHh', 128, 0, 0, ident, seq)
+    else:
+        header = struct.pack('!BBHHH', 8, 0, 0, ident, seq)
     payload = b'DEADMAN_MONITOR'
     chksum = checksum(header + payload)
-    header = struct.pack('!BBHHH', 8, 0, chksum, ident, seq)
+    if ipv6:
+        header = struct.pack('!BbHHh', 128, 0, chksum, ident, seq)
+    else:
+        header = struct.pack('!BBHHH', 8, 0, chksum, ident, seq)
     return header + payload
 
 # --- ICMP Ping 実行 ---
 def ping_once_sync(host, ident, seq):
     try:
-        with socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_ICMP) as sock:
-            packet = create_icmp_packet(ident, seq)
+        ipv6 = ':' in host
+        proto = socket.IPPROTO_ICMPV6 if ipv6 else socket.IPPROTO_ICMP
+        family = socket.AF_INET6 if ipv6 else socket.AF_INET
+        with socket.socket(family, socket.SOCK_RAW, proto) as sock:
+            packet = create_icmp_packet(ident, seq, ipv6=ipv6)
             start = time.time()
-            sock.sendto(packet, (host, 0))
-            ready = select.select([sock], [], [], 0.3)[0]
+            sock.sendto(packet, (host, 0, 0, 0) if ipv6 else (host, 0))
+            ready = select.select([sock], [], [], 0.2)[0]
             if ready:
                 data, addr = sock.recvfrom(1024)
                 if addr[0] == host:
@@ -50,7 +61,7 @@ def ping_once_sync(host, ident, seq):
 # --- TCP接続確認 ---
 async def check_tcp_port(host, port):
     try:
-        reader, writer = await asyncio.wait_for(asyncio.open_connection(host, port), timeout=1)
+        reader, writer = await asyncio.wait_for(asyncio.open_connection(host, port), timeout=0.5)
         writer.close()
         await writer.wait_closed()
         return True
@@ -83,19 +94,26 @@ def draw_screen(stdscr, results, shared):
         curses.init_pair(3, curses.COLOR_GREEN, -1)
         curses.init_pair(4, curses.COLOR_GREEN, -1)
         curses.init_pair(5, curses.COLOR_RED, -1)
-    else:
-        for i in range(1, 6):
-            curses.init_pair(i, curses.COLOR_WHITE, -1)
+
+    sort_key = 'host'
 
     while True:
         stdscr.erase()
         height, width = stdscr.getmaxyx()
-        header = "{:<16} {:<7} {:<9} {:<9} {:<6} {:<6} {}".format(
-            "Host", "Loss", "Last RTT", "Avg RTT", "SSH", "HTTP", "History"
-        )
-        stdscr.addstr(0, 0, header, curses.A_BOLD)
+        now = datetime.now().strftime("%H:%M:%S")
+        stdscr.addstr(0, 0, f"{now}   Press 'r'=refresh, 's'=sort by RTT/IP", curses.A_BOLD)
 
-        for i, (host, data) in enumerate(results.items(), 1):
+        header = "{:<20} {:<40} {:<7} {:<9} {:<9} {:<6} {:<6} {}".format(
+            "Hostname", "Host", "Loss", "Last RTT", "Avg RTT", "SSH", "HTTP", "History")
+        stdscr.addstr(1, 0, header[:width], curses.A_BOLD)
+
+        items = list(results.items())
+        if sort_key == 'rtt':
+            items.sort(key=lambda x: (x[1]['rtts'][-1] if x[1]['rtts'] else float('inf')))
+        elif sort_key == 'ip':
+            items.sort(key=lambda x: ipaddress.ip_address(x[0]))
+
+        for i, (host, data) in enumerate(items, 2):
             if i >= height:
                 break
             sent = data["sent"]
@@ -106,10 +124,11 @@ def draw_screen(stdscr, results, shared):
             last_rtt = f"{rtts[-1]:.1f}ms" if rtts else "-"
             ssh = "OK" if data["ssh"] else "NG"
             http = "OK" if data["http"] else "NG"
+            hostname = data.get("hostname", "unknown")
 
             is_current = (host == shared["current"])
             marker = ">" if is_current else " "
-            line_prefix = f"{marker}{host:<15} {loss:<7.0f} {last_rtt:<9} {avg_rtt:<9} "
+            line_prefix = f"{marker}{hostname:<19} {host:<39} {loss:<7.0f} {last_rtt:<9} {avg_rtt:<9} "
             ssh_color = curses.color_pair(3 if ssh == "OK" else 2)
             http_color = curses.color_pair(3 if http == "OK" else 2)
             ssh_http = f"{ssh:<6} {http:<6} "
@@ -127,7 +146,20 @@ def draw_screen(stdscr, results, shared):
                 stdscr.addstr(i, len(line_prefix) + len(ssh_http) + j, symbol, bar_color)
 
         stdscr.refresh()
-        time.sleep(0.1)
+        ch = stdscr.getch()
+        if ch == ord('r'):
+            return 'refresh'
+        elif ch == ord('s'):
+            sort_key = 'ip' if sort_key == 'host' else ('rtt' if sort_key == 'ip' else 'host')
+        else:
+            time.sleep(0.1)
+
+# --- ホスト名取得 ---
+def resolve_hostname(ip):
+    try:
+        return socket.gethostbyaddr(ip)[0]
+    except:
+        return "unknown"
 
 # --- 並列監視ループ ---
 async def monitor_loop(hosts, results, shared):
@@ -164,11 +196,7 @@ async def monitor_loop(hosts, results, shared):
 # --- メイン処理 ---
 async def main():
     hosts = [
-        "8.8.8.8", "1.1.1.1", "192.0.2.1", "127.0.0.1", "93.184.216.34",
-        "192.0.2.2", "192.0.2.3", "192.0.2.4", "192.0.2.5", "192.0.2.6",
-        "192.0.2.7", "192.0.2.8", "192.0.2.9", "192.0.2.10", "192.0.2.11",
-        "192.0.2.12", "192.0.2.13", "192.0.2.14", "192.0.2.15", "192.0.2.16",
-        "192.168.0.1"
+        "8.8.8.8", "1.1.1.1", "127.0.0.1", "::1", "2001:4860:4860::8888"
     ]
     results = OrderedDict()
     for host in hosts:
@@ -178,14 +206,17 @@ async def main():
             "rtts": [],
             "history": deque(maxlen=200),
             "ssh": False,
-            "http": False
+            "http": False,
+            "hostname": resolve_hostname(host)
         }
 
     shared = {"current": hosts[0]}
     asyncio.create_task(monitor_loop(hosts, results, shared))
 
-    loop = asyncio.get_event_loop()
-    await loop.run_in_executor(None, curses.wrapper, draw_screen, results, shared)
+    while True:
+        result = await asyncio.get_event_loop().run_in_executor(None, curses.wrapper, draw_screen, results, shared)
+        if result != 'refresh':
+            break
 
 if __name__ == "__main__":
     try:
