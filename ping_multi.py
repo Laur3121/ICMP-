@@ -25,9 +25,9 @@ def create_packet(ident, seq):
 def get_hostname(ip):
     try:
         host = socket.gethostbyaddr(ip)
-        return host[0]  # 逆引きDNSで得られたホスト名を返す
-    except socket.herror:
-        return "Unknown Host"  # 逆引きできなかった場合
+        return host[0]
+    except (socket.herror, socket.gaierror):
+        return "Unknown Host"
 
 async def ping_once(target_ip, seq, success_count, failure_count):
     try:
