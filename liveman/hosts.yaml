@@ -1,0 +1,59 @@
+- host: google.com
+  name: Google
+
+- host: 1.1.1.1
+  name: Cloudflare
+
+- host: 2001:4860:4860::8888
+  name: Google DNS v6
+
+- host: 127.0.0.1
+  name: localhost
+
+- host: ::1
+  name: localhost v6
+
+- host: github.com
+  name: GitHub
+
+- host: yahoo.co.jp
+  name: Yahoo Japan
+
+- host: ntp.nict.jp
+  name: NICT NTP
+
+- host: amazon.co.jp
+  name: Amazon JP
+
+- host: cloudflare.com
+  name: Cloudflare Site
+
+- host: bing.com
+  name: Bing
+
+- host: 8.8.8.8
+  name: Google DNS
+
+- host: example.com
+  name: Example
+
+- host: asahi-net.or.jp
+  name: AsahiNet
+
+- host: rakuten.co.jp
+  name: Rakuten
+
+- host: nicovideo.jp
+  name: Niconico
+
+- host: ja.wikipedia.org
+  name: Wikipedia JP
+
+- host: linode.com
+  name: Linode
+
+- host: python.org
+  name: Python.org
+
+- host: openai.com
+  name: OpenAI

@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Liveman Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { background-color: #eaeff4; font-family: 'Segoe UI', sans-serif; }
+    h2 { font-weight: bold; color: #2c3e50; }
+    .bar-O { color: #007f00; }
+    .bar-X { color: #cc0000; }
+    .clickable { cursor: pointer; text-decoration: underline; color: #0d6efd; }
+    .table { box-shadow: 0 0 8px rgba(0,0,0,0.1); background-color: white; border-radius: 8px; overflow: hidden; }
+    th { background-color: #f8f9fa; position: sticky; top: 0; z-index: 1; cursor: pointer; }
+    .chart-row { 
+      background: #fff; 
+      padding: 20px; 
+      border-radius: 12px; 
+      box-shadow: 0 0 15px rgba(0,0,0,0.1); 
+      margin: 10px 0; 
+      display: none; 
+    }
+    .chart-row.show { 
+      display: flex; 
+      gap: 20px; 
+    }
+    .chart-row.initial-show {
+      display: flex; 
+      gap: 20px;
+      animation: slideDown 0.3s ease-out;
+    }
+    @keyframes slideDown { 
+      from { opacity: 0; max-height: 0; padding: 0 20px; } 
+      to { opacity: 1; max-height: 500px; padding: 20px; } 
+    }
+    .clickable-row { cursor: pointer; transition: background-color 0.2s; }
+    .clickable-row:hover { background-color: #f8f9fa; }
+    .expanded { background-color: #e3f2fd !important; }
+    .error-message { background-color: #f8d7da; color: #721c24; padding: 10px; border-radius: 5px; margin-bottom: 20px; }
+    .summary-box { padding: 10px; background: #fff3cd; border-radius: 8px; font-size: 0.95em; margin-bottom: 15px; }
+    .chart-info { min-width: 180px; font-size: 0.9em; line-height: 1.6; }
+    .chart-canvas { flex-grow: 1; position: relative; }
+    .chart-canvas canvas { width: 100% !important; height: 300px !important; }
+    
+    /* モーダルスタイル */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      display: none;
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.show { display: flex; }
+    .modal-container {
+      background: white;
+      border-radius: 12px;
+      width: 95%;
+      height: 90%;
+      max-width: 1400px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
+    .modal-header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .modal-close {
+      background: none;
+      border: none;
+      color: white;
+      font-size: 24px;
+      cursor: pointer;
+      padding: 5px 10px;
+      border-radius: 4px;
+      transition: background 0.2s;
+    }
+    .modal-close:hover { background: rgba(255, 255, 255, 0.2); }
+    .modal-body {
+      padding: 20px;
+      height: calc(100% - 80px);
+      overflow-y: auto;
+      display: flex;
+      gap: 20px;
+    }
+    .modal-left {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .modal-right {
+      flex: 1;
+      background: #f8f9fa;
+      border-radius: 8px;
+      padding: 15px;
+      overflow-y: auto;
+    }
+    .chart-section {
+      background: white;
+      border: 2px solid #e9ecef;
+      border-radius: 12px;
+      padding: 20px;
+      height: 400px;
+    }
+    .info-section {
+      background: white;
+      border: 2px solid #e9ecef;
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .traceroute-section {
+      margin-bottom: 20px;
+    }
+    .traceroute-header {
+      font-weight: bold;
+      margin-bottom: 10px;
+      padding-bottom: 5px;
+      border-bottom: 2px solid #dee2e6;
+      color: #495057;
+    }
+    .traceroute-data {
+      font-family: 'Courier New', monospace;
+      font-size: 0.85em;
+      background: #ffffff;
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid #e0e0e0;
+      white-space: pre-wrap;
+      max-height: 200px;
+      overflow-y: auto;
+      line-height: 1.4;
+    }
+    .traceroute-history {
+      margin-top: 15px;
+    }
+    .history-item {
+      margin-bottom: 10px;
+      padding: 8px;
+      background: #f8f9fa;
+      border-radius: 6px;
+      border-left: 4px solid #007bff;
+    }
+    .history-timestamp {
+      font-size: 0.8em;
+      color: #6c757d;
+      margin-bottom: 5px;
+    }
+  </style>
+</head>
+<body>
+<div class="container mt-4">
+  <h2 class="mb-3">Liveman モニタリングダッシュボード</h2>
+  <div id="summary" class="summary-box">ロード中...</div>
+  <div id="errorMessage" class="error-message d-none">APIからデータを取得できません。</div>
+  <table id="statusTable" class="table table-bordered table-hover align-middle">
+    <thead class="table-light">
+    <tr>
+      <th onclick="sortTable(0)">Name</th>
+      <th onclick="sortTable(1)">Host</th>
+      <th onclick="sortTable(2)">Last RTT</th>
+      <th onclick="sortTable(3)">Loss</th>
+      <th onclick="sortTable(4)">Snt</th>
+      <th>History</th>
+    </tr>
+    </thead>
+    <tbody id="statusBody"></tbody>
+  </table>
+</div>
+
+<!-- モーダル -->
+<div id="hostModal" class="modal-overlay">
+  <div class="modal-container">
+    <div class="modal-header">
+      <h3 id="modalTitle">ホスト詳細情報</h3>
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-left">
+        <div class="chart-section">
+          <canvas id="modalChart"></canvas>
+        </div>
+        <div class="info-section">
+          <div id="modalInfo"></div>
+        </div>
+      </div>
+      <div class="modal-right">
+        <div class="traceroute-section">
+          <div class="traceroute-header">最新のTraceroute</div>
+          <div class="traceroute-data" id="currentTraceroute">データを取得中...</div>
+        </div>
+        <div class="traceroute-history">
+          <div class="traceroute-header">Traceroute履歴</div>
+          <div id="tracerouteHistory"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let statusData = {};
+let charts = {};
+let expandedRows = new Set();
+let lastFetch = 0;
+let isInitialRender = true;
+let historyData = {}; // フロントエンドで履歴を保存
+let tracerouteHistory = {}; // tracerouteの履歴を保存
+const MAX_HISTORY_LENGTH = 100; // 最大100ポイントまで保存
+const MAX_TRACEROUTE_HISTORY = 10; // tracerouteは最大10件まで保存
+let modalChart = null;
+
+function getBarChar(rtt) {
+  if (rtt === null) return "X";
+  if (rtt < 1) return "▁";
+  if (rtt < 3) return "▂";
+  if (rtt < 5) return "▃";
+  if (rtt < 10) return "▄";
+  if (rtt < 20) return "▅";
+  if (rtt < 40) return "▆";
+  if (rtt < 80) return "▇";
+  return "█";
+}
+
+function updateHistoryData(newData) {
+  const now = Date.now();
+  
+  Object.entries(newData).forEach(([host, info]) => {
+    if (!historyData[host]) {
+      historyData[host] = {
+        rtt: [],
+        loss: [],
+        timestamps: []
+      };
+    }
+    
+    const history = historyData[host];
+    
+    // 新しいデータポイントを追加
+    if (info.rtt != null && !isNaN(info.rtt)) {
+      history.rtt.push(info.rtt);
+      history.loss.push(info.loss ?? 0);
+      history.timestamps.push(now);
+      
+      // 最大長を超えた場合、古いデータを削除
+      if (history.rtt.length > MAX_HISTORY_LENGTH) {
+        history.rtt.shift();
+        history.loss.shift();
+        history.timestamps.shift();
+      }
+    }
+    
+    // tracerouteデータの履歴を更新
+    if (info.traceroute) {
+      if (!tracerouteHistory[host]) {
+        tracerouteHistory[host] = [];
+      }
+      
+      // 新しいtracerouteデータを追加（重複チェック）
+      const lastTraceroute = tracerouteHistory[host][0];
+      if (!lastTraceroute || lastTraceroute.data !== info.traceroute) {
+        tracerouteHistory[host].unshift({
+          data: info.traceroute,
+          timestamp: now
+        });
+        
+        // 最大履歴数を超えた場合、古いデータを削除
+        if (tracerouteHistory[host].length > MAX_TRACEROUTE_HISTORY) {
+          tracerouteHistory[host].pop();
+        }
+      }
+    }
+  });
+}
+
+function renderHistory(info, host) {
+  console.log('History data:', info);
+  
+  let rttValues = [];
+  
+  // フロントエンドで保存した履歴データを優先使用
+  if (historyData[host] && historyData[host].rtt.length > 0) {
+    rttValues = historyData[host].rtt.slice(-30); // 最新30ポイント
+  } else if (info.rtt_history && Array.isArray(info.rtt_history)) {
+    rttValues = info.rtt_history.slice(-30);
+  } else if (info.history && Array.isArray(info.history)) {
+    rttValues = info.history.map(c => {
+      if (c === 'X' || c === null) return null;
+      if (typeof c === 'number') return c;
+      if (typeof c === 'string' && !isNaN(parseFloat(c))) return parseFloat(c);
+      return null; // フォールバック値をnullに変更
+    }).slice(-30);
+  } else {
+    // データがない場合は空の配列を返す（何も表示しない）
+    rttValues = [];
+  }
+  
+  // データがない場合は「データ収集中...」を表示
+  if (rttValues.length === 0) {
+    return '<span style="color: #666; font-size: 0.9em;">データ収集中...</span>';
+  }
+  
+  return rttValues.map(rtt => `<span class="${rtt === null ? 'bar-X' : 'bar-O'}">${getBarChar(rtt)}</span>`).join('');
+}
+
+function renderTable() {
+  const tbody = document.getElementById("statusBody");
+  const currentlyExpanded = new Set(expandedRows);
+  
+  // 既存のチャートを破棄
+  Object.values(charts).forEach(chart => chart.destroy());
+  charts = {};
+  
+  tbody.innerHTML = "";
+  
+  Object.entries(statusData).forEach(([host, info]) => {
+    const hostId = host.replace(/[^a-zA-Z0-9]/g, '-');
+    const tr = document.createElement("tr");
+    tr.className = "clickable-row";
+    tr.id = `row-${hostId}`;
+    if (expandedRows.has(host)) tr.classList.add('expanded');
+
+    tr.innerHTML = `
+      <td class="clickable" onclick="openModal('${host}')">${info.name}</td>
+      <td>${host}</td>
+      <td>${info.rtt?.toFixed(2) ?? "-"}ms</td>
+      <td>${info.loss?.toFixed(2) ?? "-"}%</td>
+      <td>${info.snt ?? 0}</td>
+      <td style="font-family:monospace">${renderHistory(info, host)}</td>
+    `;
+    tbody.appendChild(tr);
+
+    const chartTr = document.createElement("tr");
+    chartTr.id = `chart-${hostId}`;
+    chartTr.className = expandedRows.has(host) ? "chart-row show" : "chart-row";
+    chartTr.innerHTML = `
+      <td colspan="6">
+        <div style="display:flex; align-items:flex-start; gap:20px; background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 0 15px rgba(0,0,0,0.1);">
+          <div class="chart-canvas">
+            <canvas id="chart-canvas-${hostId}"></canvas>
+          </div>
+          <div class="chart-info">
+            <div><strong>Avg RTT:</strong> ${info.avg_rtt?.toFixed(2) ?? "-"} ms</div>
+            <div><strong>HTTP:</strong> ${info.http ? "OK" : "NG"}</div>
+            <div><strong>SSH:</strong> ${info.ssh ? "OK" : "NG"}</div>
+          </div>
+        </div>
+      </td>`;
+    tbody.appendChild(chartTr);
+  });
+  
+  // 展開されているチャートを再描画
+  expandedRows.forEach(host => {
+    setTimeout(() => renderChart(host), 100);
+  });
+  
+  isInitialRender = false;
+}
+
+function renderChart(host) {
+  const id = host.replace(/[^a-zA-Z0-9]/g, '-');
+  const info = statusData[host];
+  if (!info) return;
+  
+  // デバッグ: データ構造を確認
+  console.log('Chart data for', host, ':', info);
+  
+  let data = [];
+  let labels = [];
+  
+  // フロントエンドで保存した履歴データを優先使用
+  if (historyData[host] && historyData[host].rtt.length > 0) {
+    data = historyData[host].rtt.slice(-50); // 最新50ポイント
+    labels = historyData[host].timestamps.slice(-50).map((timestamp, index) => {
+      const date = new Date(timestamp);
+      return `${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
+    });
+  } else if (info.rtt_history && Array.isArray(info.rtt_history)) {
+    data = info.rtt_history.filter(x => x != null && !isNaN(x));
+    labels = data.map((_, i) => `${i + 1}`);
+  } else if (info.history && Array.isArray(info.history)) {
+    // historyから数値データを抽出
+    data = info.history.map(item => {
+      if (typeof item === 'number') return item;
+      if (typeof item === 'string' && item !== 'X' && !isNaN(parseFloat(item))) {
+        return parseFloat(item);
+      }
+      return null;
+    }).filter(x => x != null);
+    labels = data.map((_, i) => `${i + 1}`);
+  } else if (info.rtt != null && !isNaN(info.rtt)) {
+    // rttの値から仮のデータを生成（最低限の表示のため）
+    data = [info.rtt];
+    labels = ['現在'];
+  }
+  
+  console.log('Processed chart data:', data);
+  
+  const ctx = document.getElementById(`chart-canvas-${id}`)?.getContext('2d');
+  if (!ctx) return;
+  
+  // 既存のチャートがあれば破棄
+  if (charts[host]) {
+    charts[host].destroy();
+  }
+  
+  if (data.length === 0) {
+    // データがない場合の表示
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    ctx.fillStyle = '#666';
+    ctx.font = '16px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('データを収集中...', ctx.canvas.width / 2, ctx.canvas.height / 2);
+    ctx.fillText('しばらくお待ちください', ctx.canvas.width / 2, ctx.canvas.height / 2 + 25);
+    return;
+  }
+  
+  charts[host] = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'RTT (ms)',
+        data: data,
+        borderColor: '#17a2b8',
+        backgroundColor: 'rgba(23,162,184,0.2)',
+        fill: true,
+        tension: 0.3,
+        pointRadius: 2,
+        pointHoverRadius: 4
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: true,
+          position: 'top'
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          title: {
+            display: true,
+            text: 'RTT (ms)'
+          }
+        },
+        x: {
+          title: {
+            display: true,
+            text: data.length > 10 ? '時刻' : 'データポイント'
+          }
+        }
+      },
+      elements: {
+        line: {
+          borderWidth: 2
+        }
+      }
+    }
+  });
+}
+
+function openModal(host) {
+  const info = statusData[host];
+  if (!info) return;
+  
+  // モーダルタイトルを設定
+  document.getElementById('modalTitle').textContent = `${info.name} (${host})`;
+  
+  // 詳細情報を設定
+  const modalInfo = document.getElementById('modalInfo');
+  modalInfo.innerHTML = `
+    <div class="row">
+      <div class="col-md-6">
+        <h5>接続状況</h5>
+        <p><strong>現在のRTT:</strong> ${info.rtt?.toFixed(2) ?? "-"} ms</p>
+        <p><strong>平均RTT:</strong> ${info.avg_rtt?.toFixed(2) ?? "-"} ms</p>
+        <p><strong>パケットロス:</strong> ${info.loss?.toFixed(2) ?? "-"}%</p>
+        <p><strong>送信パケット数:</strong> ${info.snt ?? 0}</p>
+      </div>
+      <div class="col-md-6">
+        <h5>サービス状況</h5>
+        <p><strong>HTTP:</strong> <span class="badge ${info.http ? 'bg-success' : 'bg-danger'}">${info.http ? "OK" : "NG"}</span></p>
+        <p><strong>SSH:</strong> <span class="badge ${info.ssh ? 'bg-success' : 'bg-danger'}">${info.ssh ? "OK" : "NG"}</span></p>
+      </div>
+    </div>
+  `;
+  
+  // tracerouteデータを設定
+  const currentTraceroute = document.getElementById('currentTraceroute');
+  if (info.traceroute) {
+    currentTraceroute.textContent = info.traceroute;
+  } else {
+    currentTraceroute.textContent = 'Tracerouteデータが取得できませんでした';
+  }
+  
+  // traceroute履歴を設定
+  const tracerouteHistoryDiv = document.getElementById('tracerouteHistory');
+  if (tracerouteHistory[host] && tracerouteHistory[host].length > 0) {
+    tracerouteHistoryDiv.innerHTML = tracerouteHistory[host].map((item, index) => {
+      const date = new Date(item.timestamp);
+      const timeStr = `${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}:${date.getSeconds().toString().padStart(2, '0')}`;
+      return `
+        <div class="history-item">
+          <div class="history-timestamp">${timeStr}</div>
+          <div class="traceroute-data" style="max-height: 150px;">${item.data}</div>
+        </div>
+      `;
+    }).join('');
+  } else {
+    tracerouteHistoryDiv.innerHTML = '<p class="text-muted">履歴データがありません</p>';
+  }
+  
+  // モーダルを表示
+  document.getElementById('hostModal').classList.add('show');
+  
+  // チャートを描画
+  setTimeout(() => renderModalChart(host), 100);
+}
+
+function closeModal() {
+  document.getElementById('hostModal').classList.remove('show');
+  if (modalChart) {
+    modalChart.destroy();
+    modalChart = null;
+  }
+}
+
+function renderModalChart(host) {
+  const info = statusData[host];
+  if (!info) return;
+  
+  let data = [];
+  let labels = [];
+  
+  // フロントエンドで保存した履歴データを優先使用
+  if (historyData[host] && historyData[host].rtt.length > 0) {
+    data = historyData[host].rtt.slice(-100); // 最新100ポイント
+    labels = historyData[host].timestamps.slice(-100).map((timestamp) => {
+      const date = new Date(timestamp);
+      return `${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
+    });
+  } else if (info.rtt_history && Array.isArray(info.rtt_history)) {
+    data = info.rtt_history.filter(x => x != null && !isNaN(x));
+    labels = data.map((_, i) => `${i + 1}`);
+  } else if (info.rtt != null && !isNaN(info.rtt)) {
+    data = [info.rtt];
+    labels = ['現在'];
+  }
+  
+  const ctx = document.getElementById('modalChart').getContext('2d');
+  
+  if (modalChart) {
+    modalChart.destroy();
+  }
+  
+  if (data.length === 0) {
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    ctx.fillStyle = '#666';
+    ctx.font = '16px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('データを収集中...', ctx.canvas.width / 2, ctx.canvas.height / 2);
+    return;
+  }
+  
+  modalChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'RTT (ms)',
+        data: data,
+        borderColor: '#667eea',
+        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+        fill: true,
+        tension: 0.3,
+        pointRadius: 3,
+        pointHoverRadius: 6,
+        borderWidth: 3
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: true,
+          position: 'top'
+        },
+        title: {
+          display: true,
+          text: `RTT履歴 - ${info.name}`,
+          font: {
+            size: 16,
+            weight: 'bold'
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          title: {
+            display: true,
+            text: 'RTT (ms)',
+            font: {
+              weight: 'bold'
+            }
+          },
+          grid: {
+            color: 'rgba(0, 0, 0, 0.1)'
+          }
+        },
+        x: {
+          title: {
+            display: true,
+            text: data.length > 10 ? '時刻' : 'データポイント',
+            font: {
+              weight: 'bold'
+            }
+          },
+          grid: {
+            color: 'rgba(0, 0, 0, 0.1)'
+          }
+        }
+      },
+      elements: {
+        point: {
+          hoverBackgroundColor: '#667eea'
+        }
+      }
+    }
+  });
+}
+
+function sortTable(idx) {
+  const tbody = document.getElementById("statusBody");
+  const rows = Array.from(tbody.children);
+  const dataRows = [];
+  
+  // 行をペアで取得（データ行とチャート行）
+  for (let i = 0; i < rows.length; i += 2) {
+    if (rows[i] && rows[i + 1]) {
+      dataRows.push([rows[i], rows[i + 1]]);
+    }
+  }
+  
+  dataRows.sort((a, b) => {
+    const cellA = a[0].cells[idx];
+    const cellB = b[0].cells[idx];
+    if (!cellA || !cellB) return 0;
+    
+    const textA = cellA.innerText.replace(/[^\d.-]/g, '');
+    const textB = cellB.innerText.replace(/[^\d.-]/g, '');
+    const numA = parseFloat(textA) || 0;
+    const numB = parseFloat(textB) || 0;
+    
+    if (idx === 0 || idx === 1) { // Name or Host - string sort
+      return cellA.innerText.localeCompare(cellB.innerText);
+    }
+    return numA - numB;
+  });
+  
+  // テーブルを再構築
+  tbody.innerHTML = '';
+  dataRows.forEach(([dataRow, chartRow]) => {
+    tbody.appendChild(dataRow);
+    tbody.appendChild(chartRow);
+  });
+}
+
+function updateSummary() {
+  const values = Object.values(statusData);
+  if (values.length === 0) {
+    document.getElementById("summary").textContent = "データなし";
+    return;
+  }
+  
+  const ok = values.filter(v => (v.loss ?? 100) < 50).length;
+  const ng = values.length - ok;
+  const rttValues = values.map(v => v.rtt).filter(x => x != null && !isNaN(x));
+  const rttAvg = rttValues.length ? (rttValues.reduce((a, b) => a + b, 0) / rttValues.length).toFixed(2) : "-";
+  document.getElementById("summary").textContent = `OK: ${ok} / NG: ${ng} | Avg RTT: ${rttAvg} ms`;
+}
+
+async function fetchStatus() {
+  // 展開中のチャートがある場合、頻繁な更新を避ける
+  if (expandedRows.size > 0 && Date.now() - lastFetch < 5000) return;
+  
+  try {
+    const res = await fetch("http://192.168.0.19:8000/api/status");
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    
+    const json = await res.json();
+    
+    // デバッグ: APIレスポンスの構造を確認
+    console.log('API Response:', json);
+    if (Object.keys(json).length > 0) {
+      const firstHost = Object.keys(json)[0];
+      console.log('Sample host data:', json[firstHost]);
+    }
+    
+    const dataChanged = JSON.stringify(statusData) !== JSON.stringify(json);
+    
+    if (dataChanged || isInitialRender) {
+      // 新しいデータが来た場合、履歴を更新
+      updateHistoryData(json);
+      statusData = json;
+      renderTable();
+      updateSummary();
+    }
+    
+    document.getElementById("errorMessage").classList.add("d-none");
+    lastFetch = Date.now();
+  } catch (e) {
+    console.warn("API fetch failed:", e);
+    document.getElementById("errorMessage").classList.remove("d-none");
+  }
+}
+
+// 初期化
+setInterval(fetchStatus, 3000);
+fetchStatus();
+
+// モーダルの外側をクリックした時に閉じる
+document.getElementById('hostModal').addEventListener('click', function(e) {
+  if (e.target === this) {
+    closeModal();
+  }
+});
+
+// ESCキーでモーダルを閉じる
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    closeModal();
+  }
+});
+</script>
+</body>
+</html>
