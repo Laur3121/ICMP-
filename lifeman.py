@@ -102,8 +102,15 @@ def draw_screen(stdscr, results, shared):
         now = datetime.now().strftime("%H:%M:%S")
         stdscr.addstr(0, 0, f"{now}   Press 'r'=refresh, 's'=sort by RTT/IP", curses.A_BOLD)
 
-        header = "{:<17} {:<25} {:^7} {:^9} {:^9} {:>5} {:>5} {:^7} {}".format(
-            "Hostname", "Host", "Loss", "Last RTT", "Avg RTT", "SSH", "HTTP", "SNT", "History")
+        if width >= 100:
+            header = "{:<17} {:<25} {:^7} {:^9} {:^9} {:^5} {:^5} {:^7} {}".format(
+                "Hostname", "Host", "Loss", "Last RTT", "Avg RTT", "SSH", "HTTP", "SNT", "History")
+        elif width >= 80:
+            header = "{:<10} {:<20} {:^5} {:^7} {:^7} {:^3} {:^3} {:^5}".format(
+                "Hostnm", "Host", "L", "LRT", "AVG", "S", "H", "SNT")
+        else:
+            header = "{:<6} {:<15} {:^3} {:^3}".format("Hst", "IP", "L", "S")
+
         stdscr.addstr(1, 0, header[:width], curses.A_BOLD)
 
         items = list(results.items())
@@ -127,23 +134,26 @@ def draw_screen(stdscr, results, shared):
 
             is_current = (host == shared["current"])
             marker = ">" if is_current else " "
-            line_prefix = f"{marker}{hostname:<16} {host:<24} {loss:^7.0f} {last_rtt:^9} {avg_rtt:^9} "
-            ssh_color = curses.color_pair(3 if ssh == "OK" else 2)
-            http_color = curses.color_pair(3 if http == "OK" else 2)
-            ssh_http = f"{ssh:>5} {http:>5} {sent:^7} "
+
+            if width >= 100:
+                line_prefix = f"{marker}{hostname:<16} {host:<24} {loss:^7.0f} {last_rtt:^9} {avg_rtt:^9} "
+                ssh_http = f" {ssh:^5} {http:^5} {sent:^7} "
+            elif width >= 80:
+                line_prefix = f"{marker}{hostname[:10]:<10} {host:<20} {loss:^5.0f} {last_rtt:^7} {avg_rtt:^7} "
+                ssh_http = f" {ssh:^3} {http:^3} {sent:^5} "
+            else:
+                line_prefix = f"{marker}{hostname[:6]:<6} {host[:15]:<15} {loss:^3.0f} "
+                ssh_http = f" {ssh:^2} "
 
             history_list = list(data["history"])
             max_history_len = max(0, width - len(line_prefix + ssh_http))
             clipped_history = history_list[-max_history_len:] if max_history_len > 0 else []
 
             try:
-                stdscr.addstr(i, 0, line_prefix, curses.color_pair(1))
-                stdscr.addstr(i, len(line_prefix), ssh.rjust(5), ssh_color)
-                stdscr.addstr(i, len(line_prefix) + 6, http.rjust(5), http_color)
-                stdscr.addstr(i, len(line_prefix) + 12, f"{sent:^7}", curses.color_pair(1))
+                stdscr.addstr(i, 0, line_prefix + ssh_http, curses.color_pair(1))
                 for j, (symbol, success) in enumerate(clipped_history):
                     bar_color = curses.color_pair(4 if success else 5)
-                    stdscr.addstr(i, len(line_prefix) + len(ssh_http) + j, symbol, bar_color)
+                    stdscr.addstr(i, len(line_prefix + ssh_http) + j, symbol, bar_color)
             except curses.error:
                 pass
 
