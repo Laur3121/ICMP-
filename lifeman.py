@@ -207,11 +207,14 @@ async def monitor_loop(hosts, results, shared):
             wait_time = max(0.01, 0.5 - (rtt / 1000 if rtt else 0))
             await asyncio.sleep(wait_time)
 
+# --- ホストリスト読込 ---
+def load_hosts_from_file(filename):
+    with open(filename, 'r') as f:
+        return [line.strip() for line in f if line.strip() and not line.startswith('#')]
+
 # --- メイン処理 ---
 async def main():
-    hosts = [
-        "8.8.8.8", "1.1.1.1", "127.0.0.1", "::1", "2001:4860:4860::8888"
-    ]
+    hosts = load_hosts_from_file("hosts.txt")
     results = OrderedDict()
     for host in hosts:
         results[host] = {
