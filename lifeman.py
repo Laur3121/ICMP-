@@ -52,10 +52,9 @@ def ping_once_sync(host, ident, seq):
                     return True, round(elapsed, 2)
             return False, None
     except PermissionError:
-        print("\u2757 root権限が必要です（sudoで実行）")
+        print("❗ root権限が必要です（sudoで実行）")
         exit(1)
-    except Exception as e:
-        print(f"\u2757 ping失敗: {e}")
+    except Exception:
         return False, None
 
 # --- TCP接続確認 ---
@@ -103,8 +102,8 @@ def draw_screen(stdscr, results, shared):
         now = datetime.now().strftime("%H:%M:%S")
         stdscr.addstr(0, 0, f"{now}   Press 'r'=refresh, 's'=sort by RTT/IP", curses.A_BOLD)
 
-        header = "{:<20} {:<40} {:<7} {:<9} {:<9} {:<6} {:<6} {}".format(
-            "Hostname", "Host", "Loss", "Last RTT", "Avg RTT", "SSH", "HTTP", "History")
+        header = "{:<17} {:<25} {:^7} {:^9} {:^9} {:>5} {:>5} {:^7} {}".format(
+            "Hostname", "Host", "Loss", "Last RTT", "Avg RTT", "SSH", "HTTP", "SNT", "History")
         stdscr.addstr(1, 0, header[:width], curses.A_BOLD)
 
         items = list(results.items())
@@ -128,22 +127,25 @@ def draw_screen(stdscr, results, shared):
 
             is_current = (host == shared["current"])
             marker = ">" if is_current else " "
-            line_prefix = f"{marker}{hostname:<19} {host:<39} {loss:<7.0f} {last_rtt:<9} {avg_rtt:<9} "
+            line_prefix = f"{marker}{hostname:<16} {host:<24} {loss:^7.0f} {last_rtt:^9} {avg_rtt:^9} "
             ssh_color = curses.color_pair(3 if ssh == "OK" else 2)
             http_color = curses.color_pair(3 if http == "OK" else 2)
-            ssh_http = f"{ssh:<6} {http:<6} "
+            ssh_http = f"{ssh:>5} {http:>5} {sent:^7} "
 
             history_list = list(data["history"])
             max_history_len = max(0, width - len(line_prefix + ssh_http))
             clipped_history = history_list[-max_history_len:] if max_history_len > 0 else []
 
-            stdscr.addstr(i, 0, line_prefix, curses.color_pair(1))
-            stdscr.addstr(i, len(line_prefix), ssh[:6], ssh_color)
-            stdscr.addstr(i, len(line_prefix) + 6, http[:6], http_color)
-
-            for j, (symbol, success) in enumerate(clipped_history):
-                bar_color = curses.color_pair(4 if success else 5)
-                stdscr.addstr(i, len(line_prefix) + len(ssh_http) + j, symbol, bar_color)
+            try:
+                stdscr.addstr(i, 0, line_prefix, curses.color_pair(1))
+                stdscr.addstr(i, len(line_prefix), ssh.rjust(5), ssh_color)
+                stdscr.addstr(i, len(line_prefix) + 6, http.rjust(5), http_color)
+                stdscr.addstr(i, len(line_prefix) + 12, f"{sent:^7}", curses.color_pair(1))
+                for j, (symbol, success) in enumerate(clipped_history):
+                    bar_color = curses.color_pair(4 if success else 5)
+                    stdscr.addstr(i, len(line_prefix) + len(ssh_http) + j, symbol, bar_color)
+            except curses.error:
+                pass
 
         stdscr.refresh()
         ch = stdscr.getch()
