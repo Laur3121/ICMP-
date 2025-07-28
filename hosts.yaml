@@ -1,0 +1,6 @@
+- name: Google
+  host: google.com
+- host: 1.1.1.1
+- host: 127.0.0.1
+- host: "::1"
+- host: "2001:4860:4860::8888"

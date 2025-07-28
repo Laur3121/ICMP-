@@ -5,10 +5,10 @@ import time
 import curses
 import os
 import select
-import signal
 from collections import deque, OrderedDict
 from datetime import datetime
 import ipaddress
+import yaml  # YAML読み込み用
 
 # --- ICMPユーティリティ関数 ---
 def checksum(data):
@@ -34,7 +34,6 @@ def create_icmp_packet(ident, seq, ipv6=False):
         header = struct.pack('!BBHHH', 8, 0, chksum, ident, seq)
     return header + payload
 
-# --- ICMP Ping 実行 ---
 def ping_once_sync(host, ident, seq):
     try:
         ipv6 = ':' in host
@@ -47,7 +46,7 @@ def ping_once_sync(host, ident, seq):
             ready = select.select([sock], [], [], 0.2)[0]
             if ready:
                 data, addr = sock.recvfrom(1024)
-                if addr[0] == host:
+                if addr[0] == socket.gethostbyname(host):
                     elapsed = (time.time() - start) * 1000
                     return True, round(elapsed, 2)
             return False, None
@@ -57,7 +56,6 @@ def ping_once_sync(host, ident, seq):
     except Exception:
         return False, None
 
-# --- TCP接続確認 ---
 async def check_tcp_port(host, port):
     try:
         reader, writer = await asyncio.wait_for(asyncio.open_connection(host, port), timeout=0.5)
@@ -67,7 +65,6 @@ async def check_tcp_port(host, port):
     except:
         return False
 
-# --- RTTに応じたバー文字の選択 ---
 def get_bar_char(rtt):
     if rtt is None:
         return "X"
@@ -80,8 +77,7 @@ def get_bar_char(rtt):
     if rtt < 80: return "▇"
     return "█"
 
-# --- Curses 表示 ---
-def draw_screen(stdscr, results, shared):
+def draw_screen(stdscr, results, shared, start_time):
     curses.curs_set(0)
     stdscr.nodelay(True)
     stdscr.keypad(True)
@@ -89,8 +85,6 @@ def draw_screen(stdscr, results, shared):
         curses.start_color()
         curses.use_default_colors()
         curses.init_pair(1, curses.COLOR_WHITE, -1)
-        curses.init_pair(2, curses.COLOR_RED, -1)
-        curses.init_pair(3, curses.COLOR_GREEN, -1)
         curses.init_pair(4, curses.COLOR_GREEN, -1)
         curses.init_pair(5, curses.COLOR_RED, -1)
 
@@ -99,26 +93,21 @@ def draw_screen(stdscr, results, shared):
     while True:
         stdscr.erase()
         height, width = stdscr.getmaxyx()
-        now = datetime.now().strftime("%H:%M:%S")
-        stdscr.addstr(0, 0, f"{now}   Press 'r'=refresh, 's'=sort by RTT/IP", curses.A_BOLD)
+        elapsed = int(time.time() - start_time)
+        h, m, s = elapsed // 3600, (elapsed % 3600) // 60, elapsed % 60
+        elapsed_str = f"{h:02}:{m:02}:{s:02}"
+        stdscr.addstr(0, 0, f"Elapsed {elapsed_str}   Press 'r'=refresh, 's'=sort, 'q'=quit", curses.A_BOLD)
         stdscr.addstr(1, 0, f"Sorted by: {sort_key.upper()}", curses.A_DIM)
 
-        if width >= 100:
-            header = "{:<17} {:<25} {:^7} {:^9} {:^9} {:^5} {:^5} {:^7} {}".format(
-                "Hostname", "Host", "Loss", "Last RTT", "Avg RTT", "SSH", "HTTP", "SNT", "History")
-        elif width >= 80:
-            header = "{:<10} {:<20} {:^5} {:^7} {:^7} {:^3} {:^3} {:^5}".format(
-                "Hostnm", "Host", "L", "LRT", "AVG", "S", "H", "SNT")
-        else:
-            header = "{:<6} {:<15} {:^3} {:^3}".format("Hst", "IP", "L", "S")
-
+        header = "{:<17} {:<25} {:^7} {:^9} {:^9} {:^5} {:^5} {:^7} {}".format(
+            "Name", "Host", "Loss", "Last RTT", "Avg RTT", "SSH", "HTTP", "SNT", "History")
         stdscr.addstr(2, 0, header[:width], curses.A_BOLD)
 
         items = list(results.items())
         if sort_key == 'rtt':
             items.sort(key=lambda x: (x[1]['rtts'][-1] if x[1]['rtts'] else float('inf')))
         elif sort_key == 'ip':
-            items.sort(key=lambda x: (0, ipaddress.IPv4Address(x[0])) if ':' not in x[0] else (1, ipaddress.IPv6Address(x[0])))
+            items.sort(key=lambda x: (0, ipaddress.ip_address(x[0])))
 
         for i, (host, data) in enumerate(items, 3):
             if i >= height:
@@ -136,15 +125,8 @@ def draw_screen(stdscr, results, shared):
             is_current = (host == shared["current"])
             marker = ">" if is_current else " "
 
-            if width >= 100:
-                line_prefix = f"{marker}{hostname:<16} {host:<24} {loss:^7.0f} {last_rtt:^9} {avg_rtt:^9} "
-                ssh_http = f" {ssh:^5} {http:^5} {sent:^7} "
-            elif width >= 80:
-                line_prefix = f"{marker}{hostname[:10]:<10} {host:<20} {loss:^5.0f} {last_rtt:^7} {avg_rtt:^7} "
-                ssh_http = f" {ssh:^3} {http:^3} {sent:^5} "
-            else:
-                line_prefix = f"{marker}{hostname[:6]:<6} {host[:15]:<15} {loss:^3.0f} "
-                ssh_http = f" {ssh:^2} "
+            line_prefix = f"{marker}{hostname:<16} {host:<24} {loss:^7.0f} {last_rtt:^9} {avg_rtt:^9} "
+            ssh_http = f"{ssh:^5} {http:^5} {sent:^7} "
 
             history_list = list(data["history"])
             max_history_len = max(0, width - len(line_prefix + ssh_http))
@@ -164,23 +146,25 @@ def draw_screen(stdscr, results, shared):
             return 'refresh'
         elif ch == ord('s'):
             sort_key = 'ip' if sort_key == 'host' else ('rtt' if sort_key == 'ip' else 'host')
+        elif ch == ord('q'):
+            return 'quit'
         else:
             time.sleep(0.1)
 
-# --- ホスト名取得 ---
-def resolve_hostname(ip):
+# --- ホスト名逆引き ---
+def resolve_hostname(ip_or_host):
     try:
-        return socket.gethostbyaddr(ip)[0]
+        return socket.gethostbyaddr(ip_or_host)[0]
     except:
         return "unknown"
 
-# --- 並列監視ループ ---
 async def monitor_loop(hosts, results, shared):
     ident = os.getpid() & 0xFFFF
     seq = 0
     loop = asyncio.get_event_loop()
     while True:
-        for host in hosts:
+        for entry in hosts:
+            host = entry["host"]
             shared["current"] = host
             data = results[host]
 
@@ -207,16 +191,16 @@ async def monitor_loop(hosts, results, shared):
             wait_time = max(0.01, 0.5 - (rtt / 1000 if rtt else 0))
             await asyncio.sleep(wait_time)
 
-# --- ホストリスト読込 ---
-def load_hosts_from_file(filename):
+def load_hosts_from_file(filename="hosts.yaml"):
     with open(filename, 'r') as f:
-        return [line.strip() for line in f if line.strip() and not line.startswith('#')]
+        return yaml.safe_load(f)
 
-# --- メイン処理 ---
 async def main():
-    hosts = load_hosts_from_file("hosts.txt")
+    hosts = load_hosts_from_file("hosts.yaml")
     results = OrderedDict()
-    for host in hosts:
+    for entry in hosts:
+        host = entry["host"]
+        name = entry.get("name") or resolve_hostname(host)
         results[host] = {
             "sent": 0,
             "received": 0,
@@ -224,15 +208,18 @@ async def main():
             "history": deque(maxlen=200),
             "ssh": False,
             "http": False,
-            "hostname": resolve_hostname(host)
+            "hostname": name
         }
 
-    shared = {"current": hosts[0]}
+    shared = {"current": hosts[0]["host"]}
+    start_time = time.time()
     asyncio.create_task(monitor_loop(hosts, results, shared))
 
     while True:
-        result = await asyncio.get_event_loop().run_in_executor(None, curses.wrapper, draw_screen, results, shared)
-        if result != 'refresh':
+        result = await asyncio.get_event_loop().run_in_executor(
+            None, curses.wrapper, lambda stdscr: draw_screen(stdscr, results, shared, start_time)
+        )
+        if result == 'quit':
             break
 
 if __name__ == "__main__":
@@ -240,3 +227,4 @@ if __name__ == "__main__":
         asyncio.run(main())
     except KeyboardInterrupt:
         print("\n監視を終了します。")
+
