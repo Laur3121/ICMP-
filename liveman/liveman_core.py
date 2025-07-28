@@ -172,22 +172,22 @@ def run_traceroute_sync(host, max_hops=30, timeout=5):
                 cmd = ['tracert', '-4', '-h', str(max_hops), '-w', str(timeout * 1000), host]
         else:  # Unix/Linux
             if is_ipv6:
-                # IPv6用のtracerouteコマンドを試行
                 for traceroute_cmd in ['traceroute6', 'traceroute -6']:
                     try:
-                        cmd = traceroute_cmd.split() + ['-m', str(max_hops), '-w', str(timeout), host]
-                        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+                        cmd = traceroute_cmd.split() + ['-n', '-m', str(max_hops), '-w', str(timeout), host]
+                        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
                         if result.returncode == 0:
                             return result.stdout.strip()
                     except (subprocess.TimeoutExpired, FileNotFoundError):
                         continue
                 return "IPv6 traceroute command not available"
             else:
-                cmd = ['traceroute', '-m', str(max_hops), '-w', str(timeout), host]
+                cmd = ['sudo', 'traceroute', '-P', 'tcp', '-p', '80', '-n', '-m', '30', '-w', '3', host]
+
         
         # tracerouteコマンド実行
         print(f"Running traceroute command: {' '.join(cmd)}")
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
         
         if result.returncode == 0:
             return result.stdout.strip()
