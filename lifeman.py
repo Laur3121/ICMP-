@@ -101,6 +101,7 @@ def draw_screen(stdscr, results, shared):
         height, width = stdscr.getmaxyx()
         now = datetime.now().strftime("%H:%M:%S")
         stdscr.addstr(0, 0, f"{now}   Press 'r'=refresh, 's'=sort by RTT/IP", curses.A_BOLD)
+        stdscr.addstr(1, 0, f"Sorted by: {sort_key.upper()}", curses.A_DIM)
 
         if width >= 100:
             header = "{:<17} {:<25} {:^7} {:^9} {:^9} {:^5} {:^5} {:^7} {}".format(
@@ -111,15 +112,15 @@ def draw_screen(stdscr, results, shared):
         else:
             header = "{:<6} {:<15} {:^3} {:^3}".format("Hst", "IP", "L", "S")
 
-        stdscr.addstr(1, 0, header[:width], curses.A_BOLD)
+        stdscr.addstr(2, 0, header[:width], curses.A_BOLD)
 
         items = list(results.items())
         if sort_key == 'rtt':
             items.sort(key=lambda x: (x[1]['rtts'][-1] if x[1]['rtts'] else float('inf')))
         elif sort_key == 'ip':
-            items.sort(key=lambda x: ipaddress.ip_address(x[0]))
+            items.sort(key=lambda x: (0, ipaddress.IPv4Address(x[0])) if ':' not in x[0] else (1, ipaddress.IPv6Address(x[0])))
 
-        for i, (host, data) in enumerate(items, 2):
+        for i, (host, data) in enumerate(items, 3):
             if i >= height:
                 break
             sent = data["sent"]
@@ -202,8 +203,9 @@ async def monitor_loop(hosts, results, shared):
             else:
                 data["history"].append(("X", False))
 
-            await asyncio.sleep(0.01)
             seq += 1
+            wait_time = max(0.01, 0.5 - (rtt / 1000 if rtt else 0))
+            await asyncio.sleep(wait_time)
 
 # --- メイン処理 ---
 async def main():
