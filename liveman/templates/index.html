@@ -7,43 +7,216 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    body { background-color: #eaeff4; font-family: 'Segoe UI', sans-serif; }
-    h2 { font-weight: bold; color: #2c3e50; }
-    .bar-O { color: #007f00; }
-    .bar-X { color: #cc0000; }
-    .clickable { cursor: pointer; text-decoration: underline; color: #0d6efd; }
-    .table { box-shadow: 0 0 8px rgba(0,0,0,0.1); background-color: white; border-radius: 8px; overflow: hidden; }
-    th { background-color: #f8f9fa; position: sticky; top: 0; z-index: 1; cursor: pointer; }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    
+    :root {
+      --primary-gray: #f8f9fa;
+      --secondary-gray: #e9ecef;
+      --text-primary: #212529;
+      --text-secondary: #6c757d;
+      --text-muted: #adb5bd;
+      --border-light: #dee2e6;
+      --border-subtle: #f1f3f4;
+      --success-color: #10b981;
+      --danger-color: #ef4444;
+      --warning-color: #f59e0b;
+      --info-color: #3b82f6;
+      --surface-white: #ffffff;
+      --surface-gray: #f7f8fc;
+      --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+      --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body { 
+      background: var(--surface-gray);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      color: var(--text-primary);
+      line-height: 1.6;
+      font-weight: 400;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    .container {
+      background: var(--surface-white);
+      border-radius: 12px;
+      padding: 2rem;
+      margin: 2rem auto;
+      box-shadow: var(--shadow-lg);
+      border: 1px solid var(--border-subtle);
+      max-width: 1200px;
+    }
+
+    h2 { 
+      font-weight: 700;
+      font-size: 2rem;
+      color: var(--text-primary);
+      margin-bottom: 2rem;
+      text-align: center;
+      letter-spacing: -0.025em;
+    }
+
+    .bar-O { 
+      color: var(--success-color);
+      font-weight: 500;
+    }
+    .bar-X { 
+      color: var(--danger-color);
+      font-weight: 500;
+    }
+
+    .clickable { 
+      cursor: pointer;
+      color: var(--info-color);
+      text-decoration: none;
+      font-weight: 500;
+      transition: color 0.2s ease;
+    }
+
+    .clickable:hover {
+      color: var(--text-primary);
+    }
+
+    .table { 
+      background: var(--surface-white);
+      border: 1px solid var(--border-light);
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
+    }
+
+    th { 
+      background: var(--primary-gray);
+      color: var(--text-primary);
+      font-weight: 600;
+      font-size: 0.875rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      cursor: pointer;
+      border: none;
+      padding: 1rem 1.5rem;
+      transition: background-color 0.2s ease;
+    }
+
+    th:hover {
+      background: var(--secondary-gray);
+    }
+
+    .table td {
+      background: var(--surface-white);
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 1rem 1.5rem;
+      vertical-align: middle;
+      font-size: 0.875rem;
+    }
+
+    .table tbody tr:last-child td {
+      border-bottom: none;
+    }
+
     .chart-row { 
-      background: #fff; 
-      padding: 20px; 
-      border-radius: 12px; 
-      box-shadow: 0 0 15px rgba(0,0,0,0.1); 
-      margin: 10px 0; 
-      display: none; 
+      background: var(--surface-white);
+      border: 1px solid var(--border-light);
+      padding: 2rem;
+      border-radius: 8px;
+      margin: 0.5rem 0;
+      display: none;
+      box-shadow: var(--shadow-sm);
     }
+
     .chart-row.show { 
-      display: flex; 
-      gap: 20px; 
-    }
-    .chart-row.initial-show {
-      display: flex; 
-      gap: 20px;
+      display: flex;
+      gap: 2rem;
       animation: slideDown 0.3s ease-out;
     }
+
     @keyframes slideDown { 
-      from { opacity: 0; max-height: 0; padding: 0 20px; } 
-      to { opacity: 1; max-height: 500px; padding: 20px; } 
+      from { 
+        opacity: 0;
+        transform: translateY(-8px);
+      } 
+      to { 
+        opacity: 1;
+        transform: translateY(0);
+      } 
     }
-    .clickable-row { cursor: pointer; transition: background-color 0.2s; }
-    .clickable-row:hover { background-color: #f8f9fa; }
-    .expanded { background-color: #e3f2fd !important; }
-    .error-message { background-color: #f8d7da; color: #721c24; padding: 10px; border-radius: 5px; margin-bottom: 20px; }
-    .summary-box { padding: 10px; background: #fff3cd; border-radius: 8px; font-size: 0.95em; margin-bottom: 15px; }
-    .chart-info { min-width: 180px; font-size: 0.9em; line-height: 1.6; }
-    .chart-canvas { flex-grow: 1; position: relative; }
-    .chart-canvas canvas { width: 100% !important; height: 300px !important; }
-    
+
+    .clickable-row { 
+      cursor: pointer;
+      transition: background-color 0.15s ease;
+    }
+
+    .clickable-row:hover {
+      background: var(--primary-gray);
+    }
+
+    .expanded { 
+      background: var(--primary-gray) !important;
+      border-left: 3px solid var(--info-color);
+    }
+
+    .error-message { 
+      background: #fef2f2;
+      color: var(--danger-color);
+      padding: 1rem;
+      border-radius: 6px;
+      margin-bottom: 1.5rem;
+      border: 1px solid #fecaca;
+      font-size: 0.875rem;
+    }
+
+    .summary-box { 
+      padding: 1.5rem;
+      background: var(--primary-gray);
+      border: 1px solid var(--border-light);
+      border-radius: 6px;
+      font-size: 0.875rem;
+      margin-bottom: 2rem;
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+
+    .chart-info { 
+      min-width: 240px;
+      font-size: 0.875rem;
+      line-height: 1.6;
+      background: var(--primary-gray);
+      padding: 1.5rem;
+      border-radius: 6px;
+      border: 1px solid var(--border-light);
+    }
+
+    .chart-info strong {
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+
+    .chart-canvas { 
+      flex-grow: 1;
+      position: relative;
+      background: var(--surface-white);
+      border-radius: 6px;
+      padding: 1rem;
+      border: 1px solid var(--border-subtle);
+    }
+
+    .chart-canvas canvas { 
+      width: 100% !important;
+      height: 300px !important;
+      border-radius: 4px;
+    }
+
     /* モーダルスタイル */
     .modal-overlay {
       position: fixed;
@@ -51,111 +224,288 @@
       left: 0;
       width: 100%;
       height: 100%;
-      background: rgba(0, 0, 0, 0.7);
+      background: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(4px);
       display: none;
       z-index: 1000;
       align-items: center;
       justify-content: center;
+      animation: fadeIn 0.2s ease;
     }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
     .modal-overlay.show { display: flex; }
+
     .modal-container {
-      background: white;
+      background: var(--surface-white);
+      border: 1px solid var(--border-light);
       border-radius: 12px;
       width: 95%;
       height: 90%;
-      max-width: 1400px;
+      max-width: 1200px;
       position: relative;
       overflow: hidden;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      box-shadow: var(--shadow-xl);
+      animation: modalSlideIn 0.3s ease-out;
     }
+
+    @keyframes modalSlideIn {
+      from {
+        opacity: 0;
+        transform: scale(0.95) translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+      }
+    }
+
     .modal-header {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 20px;
+      background: var(--primary-gray);
+      border-bottom: 1px solid var(--border-light);
+      padding: 1.5rem 2rem;
       display: flex;
       justify-content: space-between;
       align-items: center;
     }
-    .modal-close {
-      background: none;
-      border: none;
-      color: white;
-      font-size: 24px;
-      cursor: pointer;
-      padding: 5px 10px;
-      border-radius: 4px;
-      transition: background 0.2s;
+
+    .modal-header h3 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin: 0;
+      color: var(--text-primary);
     }
-    .modal-close:hover { background: rgba(255, 255, 255, 0.2); }
+
+    .modal-close {
+      background: var(--surface-white);
+      border: 1px solid var(--border-light);
+      color: var(--text-secondary);
+      font-size: 20px;
+      cursor: pointer;
+      padding: 0.5rem;
+      border-radius: 6px;
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+    }
+
+    .modal-close:hover { 
+      background: var(--secondary-gray);
+      color: var(--text-primary);
+    }
+
     .modal-body {
-      padding: 20px;
+      padding: 2rem;
       height: calc(100% - 80px);
       overflow-y: auto;
       display: flex;
-      gap: 20px;
+      gap: 2rem;
     }
+
     .modal-left {
       flex: 1;
       display: flex;
       flex-direction: column;
-      gap: 20px;
+      gap: 1.5rem;
     }
+
     .modal-right {
       flex: 1;
-      background: #f8f9fa;
+      background: var(--primary-gray);
+      border: 1px solid var(--border-light);
       border-radius: 8px;
-      padding: 15px;
+      padding: 1.5rem;
       overflow-y: auto;
     }
+
     .chart-section {
-      background: white;
-      border: 2px solid #e9ecef;
-      border-radius: 12px;
-      padding: 20px;
+      background: var(--surface-white);
+      border: 1px solid var(--border-light);
+      border-radius: 8px;
+      padding: 1.5rem;
       height: 400px;
     }
+
     .info-section {
-      background: white;
-      border: 2px solid #e9ecef;
-      border-radius: 12px;
-      padding: 20px;
+      background: var(--surface-white);
+      border: 1px solid var(--border-light);
+      border-radius: 8px;
+      padding: 1.5rem;
     }
+
     .traceroute-section {
-      margin-bottom: 20px;
+      margin-bottom: 2rem;
     }
+
     .traceroute-header {
-      font-weight: bold;
-      margin-bottom: 10px;
-      padding-bottom: 5px;
-      border-bottom: 2px solid #dee2e6;
-      color: #495057;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid var(--border-light);
+      color: var(--text-primary);
+      font-size: 1rem;
     }
+
     .traceroute-data {
-      font-family: 'Courier New', monospace;
-      font-size: 0.85em;
-      background: #ffffff;
-      padding: 10px;
+      background: var(--surface-white);
+      border: 1px solid var(--border-light);
+      padding: 1rem;
       border-radius: 6px;
-      border: 1px solid #e0e0e0;
-      white-space: pre-wrap;
-      max-height: 200px;
+      max-height: 250px;
       overflow-y: auto;
-      line-height: 1.4;
+      line-height: 1.5;
     }
+
     .traceroute-history {
-      margin-top: 15px;
+      margin-top: 1.5rem;
     }
+
     .history-item {
-      margin-bottom: 10px;
-      padding: 8px;
-      background: #f8f9fa;
+      margin-bottom: 1rem;
+      padding: 1rem;
+      background: var(--surface-white);
+      border: 1px solid var(--border-light);
       border-radius: 6px;
-      border-left: 4px solid #007bff;
+      border-left: 3px solid var(--info-color);
     }
+
     .history-timestamp {
-      font-size: 0.8em;
-      color: #6c757d;
-      margin-bottom: 5px;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-bottom: 0.5rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .hop-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .hop-item:last-child {
+      border-bottom: none;
+    }
+
+    .hop-number {
+      font-weight: 600;
+      color: var(--text-secondary);
+      min-width: 30px;
+      font-size: 0.875rem;
+    }
+
+    .hop-info {
+      flex-grow: 1;
+      margin-left: 1rem;
+    }
+
+    .hop-hostname {
+      font-weight: 500;
+      color: var(--text-primary);
+      font-size: 0.875rem;
+    }
+
+    .hop-ip {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+      margin-top: 0.25rem;
+    }
+
+    .hop-rtt {
+      font-weight: 600;
+      color: var(--success-color);
+      min-width: 60px;
+      text-align: right;
+      font-size: 0.875rem;
+    }
+
+    .hop-timeout {
+      color: var(--text-muted);
+      font-style: italic;
+    }
+
+    .badge {
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-weight: 500;
+      font-size: 0.75rem;
+      border: none;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .bg-success {
+      background: var(--success-color);
+      color: white;
+    }
+
+    .bg-danger {
+      background: var(--danger-color);
+      color: white;
+    }
+
+    /* スクロールバーのスタイリング */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--primary-gray);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--border-light);
+      border-radius: 3px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--text-muted);
+    }
+
+    /* フォーカス状態 */
+    .clickable:focus,
+    .modal-close:focus,
+    th:focus {
+      outline: 2px solid var(--info-color);
+      outline-offset: 2px;
+    }
+
+    /* レスポンシブ対応 */
+    @media (max-width: 768px) {
+      .modal-body {
+        flex-direction: column;
+        padding: 1rem;
+      }
+      
+      .container {
+        margin: 1rem;
+        padding: 1rem;
+      }
+      
+      h2 {
+        font-size: 1.5rem;
+      }
+      
+      .chart-row {
+        flex-direction: column;
+        gap: 1rem;
+      }
+      
+      .chart-info {
+        min-width: auto;
+      }
     }
   </style>
 </head>
@@ -220,6 +570,8 @@ let tracerouteHistory = {}; // tracerouteの履歴を保存
 const MAX_HISTORY_LENGTH = 100; // 最大100ポイントまで保存
 const MAX_TRACEROUTE_HISTORY = 10; // tracerouteは最大10件まで保存
 let modalChart = null;
+let hostDataAge = {}; // 各ホストのデータ最終更新時刻を記録
+const DATA_STALE_THRESHOLD = 30000; // 30秒でデータが古いと判定
 
 function getBarChar(rtt) {
   if (rtt === null) return "X";
@@ -233,6 +585,53 @@ function getBarChar(rtt) {
   return "█";
 }
 
+function parseTraceroute(tracerouteData) {
+  if (!tracerouteData) return null;
+  
+  try {
+    // 文字列の場合はJSONとしてパース
+    if (typeof tracerouteData === 'string') {
+      return JSON.parse(tracerouteData);
+    }
+    // すでにオブジェクトの場合はそのまま返す
+    return tracerouteData;
+  } catch (e) {
+    console.warn('Failed to parse traceroute data:', e);
+    return null;
+  }
+}
+
+function formatTracerouteHtml(tracerouteData) {
+  const parsed = parseTraceroute(tracerouteData);
+  if (!parsed || !Array.isArray(parsed)) {
+    return '<div class="text-muted">Tracerouteデータが無効です</div>';
+  }
+  
+  return parsed.map(hop => {
+    const hopNum = hop.hop || '?';
+    const hostname = hop.hostname || 'unknown';
+    const ip = hop.ip || '';
+    const rtt = hop.rtt;
+    
+    // IPアドレスとホスト名が同じ場合はIPアドレスのみ表示
+    const displayName = (hostname === ip || hostname === 'unknown') ? 
+      (ip || 'unknown') : hostname;
+    
+    return `
+      <div class="hop-item">
+        <div class="hop-number">${hopNum}</div>
+        <div class="hop-info">
+          <div class="hop-hostname">${displayName}</div>
+          ${ip && ip !== hostname ? `<div class="hop-ip">${ip}</div>` : ''}
+        </div>
+        <div class="hop-rtt ${rtt === null ? 'hop-timeout' : ''}">
+          ${rtt !== null ? `${rtt}ms` : '* * *'}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
 function updateHistoryData(newData) {
   const now = Date.now();
   
@@ -244,6 +643,9 @@ function updateHistoryData(newData) {
         timestamps: []
       };
     }
+    
+    // ホストのデータ更新時刻を記録
+    hostDataAge[host] = now;
     
     const history = historyData[host];
     
@@ -285,8 +687,6 @@ function updateHistoryData(newData) {
 }
 
 function renderHistory(info, host) {
-  console.log('History data:', info);
-  
   let rttValues = [];
   
   // フロントエンドで保存した履歴データを優先使用
@@ -299,24 +699,57 @@ function renderHistory(info, host) {
       if (c === 'X' || c === null) return null;
       if (typeof c === 'number') return c;
       if (typeof c === 'string' && !isNaN(parseFloat(c))) return parseFloat(c);
-      return null; // フォールバック値をnullに変更
+      return null;
     }).slice(-30);
   } else {
-    // データがない場合は空の配列を返す（何も表示しない）
     rttValues = [];
   }
   
-  // データがない場合は「データ収集中...」を表示
+  // データがない場合は時間に応じてメッセージを変更
   if (rttValues.length === 0) {
-    return '<span style="color: #666; font-size: 0.9em;">データ収集中...</span>';
+    const now = Date.now();
+    const lastUpdate = hostDataAge[host] || now;
+    const timeSinceUpdate = now - lastUpdate;
+    
+    if (timeSinceUpdate > DATA_STALE_THRESHOLD) {
+      return '<span style="color: var(--danger-color); font-size: 0.9em;">⚠️ 接続に問題があります</span>';
+    } else {
+      return '<span style="color: var(--text-muted); font-size: 0.9em;">📡 データ収集中...</span>';
+    }
   }
   
   return rttValues.map(rtt => `<span class="${rtt === null ? 'bar-X' : 'bar-O'}">${getBarChar(rtt)}</span>`).join('');
 }
 
+function toggleChart(host) {
+  const id = host.replace(/[^a-zA-Z0-9]/g, '-');
+  const chartRow = document.getElementById(`chart-${id}`);
+  const dataRow = document.getElementById(`row-${id}`);
+  
+  if (expandedRows.has(host)) {
+    // 折りたたみ
+    expandedRows.delete(host);
+    chartRow.classList.remove('show');
+    dataRow.classList.remove('expanded');
+    
+    // チャートを破棄
+    if (charts[host]) {
+      charts[host].destroy();
+      delete charts[host];
+    }
+  } else {
+    // 展開
+    expandedRows.add(host);
+    chartRow.classList.add(isInitialRender ? 'initial-show' : 'show');
+    dataRow.classList.add('expanded');
+    
+    // チャートを描画
+    setTimeout(() => renderChart(host), 100);
+  }
+}
+
 function renderTable() {
   const tbody = document.getElementById("statusBody");
-  const currentlyExpanded = new Set(expandedRows);
   
   // 既存のチャートを破棄
   Object.values(charts).forEach(chart => chart.destroy());
@@ -339,6 +772,16 @@ function renderTable() {
       <td>${info.snt ?? 0}</td>
       <td style="font-family:monospace">${renderHistory(info, host)}</td>
     `;
+    
+    // 行クリックイベントを追加（モーダル開くセル以外）
+    tr.addEventListener('click', function(e) {
+      // モーダルを開くセル（最初のセル）がクリックされた場合は何もしない
+      if (e.target.classList.contains('clickable')) {
+        return;
+      }
+      toggleChart(host);
+    });
+    
     tbody.appendChild(tr);
 
     const chartTr = document.createElement("tr");
@@ -373,9 +816,6 @@ function renderChart(host) {
   const info = statusData[host];
   if (!info) return;
   
-  // デバッグ: データ構造を確認
-  console.log('Chart data for', host, ':', info);
-  
   let data = [];
   let labels = [];
   
@@ -405,8 +845,6 @@ function renderChart(host) {
     labels = ['現在'];
   }
   
-  console.log('Processed chart data:', data);
-  
   const ctx = document.getElementById(`chart-canvas-${id}`)?.getContext('2d');
   if (!ctx) return;
   
@@ -416,13 +854,27 @@ function renderChart(host) {
   }
   
   if (data.length === 0) {
-    // データがない場合の表示
+    // データがない場合の表示（時間に応じてメッセージを変更）
+    const now = Date.now();
+    const lastUpdate = hostDataAge[host] || now;
+    const timeSinceUpdate = now - lastUpdate;
+    
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-    ctx.fillStyle = '#666';
-    ctx.font = '16px Arial';
+    ctx.font = '16px Inter, Arial, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('データを収集中...', ctx.canvas.width / 2, ctx.canvas.height / 2);
-    ctx.fillText('しばらくお待ちください', ctx.canvas.width / 2, ctx.canvas.height / 2 + 25);
+    
+    if (timeSinceUpdate > DATA_STALE_THRESHOLD) {
+      ctx.fillStyle = 'var(--danger-color)';
+      ctx.fillText('⚠️ 接続に問題があります', ctx.canvas.width / 2, ctx.canvas.height / 2 - 15);
+      ctx.fillStyle = 'var(--text-muted)';
+      ctx.font = '14px Inter, Arial, sans-serif';
+      ctx.fillText('データの取得ができていません', ctx.canvas.width / 2, ctx.canvas.height / 2 + 15);
+    } else {
+      ctx.fillStyle = 'var(--text-muted)';
+      ctx.fillText('📡 データを収集中...', ctx.canvas.width / 2, ctx.canvas.height / 2 - 15);
+      ctx.font = '14px Inter, Arial, sans-serif';
+      ctx.fillText('しばらくお待ちください', ctx.canvas.width / 2, ctx.canvas.height / 2 + 15);
+    }
     return;
   }
   
@@ -433,12 +885,19 @@ function renderChart(host) {
       datasets: [{
         label: 'RTT (ms)',
         data: data,
-        borderColor: '#17a2b8',
-        backgroundColor: 'rgba(23,162,184,0.2)',
+        borderColor: 'var(--info-color)',
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
         fill: true,
-        tension: 0.3,
+        tension: 0.4,
         pointRadius: 2,
-        pointHoverRadius: 4
+        pointHoverRadius: 6,
+        borderWidth: 2,
+        pointBackgroundColor: 'var(--info-color)',
+        pointBorderColor: 'var(--surface-white)',
+        pointBorderWidth: 2,
+        pointHoverBackgroundColor: 'var(--info-color)',
+        pointHoverBorderColor: 'var(--surface-white)',
+        pointHoverBorderWidth: 2
       }]
     },
     options: {
@@ -447,7 +906,16 @@ function renderChart(host) {
       plugins: {
         legend: {
           display: true,
-          position: 'top'
+          position: 'top',
+          labels: {
+            color: 'var(--text-primary)',
+            font: {
+              size: 14,
+              weight: '500'
+            },
+            usePointStyle: true,
+            pointStyle: 'circle'
+          }
         }
       },
       scales: {
@@ -455,13 +923,43 @@ function renderChart(host) {
           beginAtZero: true,
           title: {
             display: true,
-            text: 'RTT (ms)'
+            text: 'RTT (ms)',
+            color: 'var(--text-primary)',
+            font: {
+              size: 12,
+              weight: '600'
+            }
+          },
+          ticks: {
+            color: 'var(--text-secondary)',
+            font: {
+              size: 11
+            }
+          },
+          grid: {
+            color: 'var(--border-subtle)',
+            borderColor: 'var(--border-light)'
           }
         },
         x: {
           title: {
             display: true,
-            text: data.length > 10 ? '時刻' : 'データポイント'
+            text: data.length > 10 ? '時刻' : 'データポイント',
+            color: 'var(--text-primary)',
+            font: {
+              size: 12,
+              weight: '600'
+            }
+          },
+          ticks: {
+            color: 'var(--text-secondary)',
+            font: {
+              size: 11
+            }
+          },
+          grid: {
+            color: 'var(--border-subtle)',
+            borderColor: 'var(--border-light)'
           }
         }
       },
@@ -469,6 +967,10 @@ function renderChart(host) {
         line: {
           borderWidth: 2
         }
+      },
+      interaction: {
+        intersect: false,
+        mode: 'index'
       }
     }
   });
@@ -503,9 +1005,9 @@ function openModal(host) {
   // tracerouteデータを設定
   const currentTraceroute = document.getElementById('currentTraceroute');
   if (info.traceroute) {
-    currentTraceroute.textContent = info.traceroute;
+    currentTraceroute.innerHTML = formatTracerouteHtml(info.traceroute);
   } else {
-    currentTraceroute.textContent = 'Tracerouteデータが取得できませんでした';
+    currentTraceroute.innerHTML = '<div class="text-muted">Tracerouteデータが取得できませんでした</div>';
   }
   
   // traceroute履歴を設定
@@ -517,7 +1019,7 @@ function openModal(host) {
       return `
         <div class="history-item">
           <div class="history-timestamp">${timeStr}</div>
-          <div class="traceroute-data" style="max-height: 150px;">${item.data}</div>
+          <div class="traceroute-data">${formatTracerouteHtml(item.data)}</div>
         </div>
       `;
     }).join('');
@@ -569,11 +1071,26 @@ function renderModalChart(host) {
   }
   
   if (data.length === 0) {
+    const now = Date.now();
+    const lastUpdate = hostDataAge[host] || now;
+    const timeSinceUpdate = now - lastUpdate;
+    
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-    ctx.fillStyle = '#666';
-    ctx.font = '16px Arial';
+    ctx.font = '18px Inter, Arial, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('データを収集中...', ctx.canvas.width / 2, ctx.canvas.height / 2);
+    
+    if (timeSinceUpdate > DATA_STALE_THRESHOLD) {
+      ctx.fillStyle = 'var(--danger-color)';
+      ctx.fillText('⚠️ 接続に問題があります', ctx.canvas.width / 2, ctx.canvas.height / 2 - 15);
+      ctx.fillStyle = 'var(--text-muted)';
+      ctx.font = '14px Inter, Arial, sans-serif';
+      ctx.fillText('データの取得ができていません', ctx.canvas.width / 2, ctx.canvas.height / 2 + 15);
+    } else {
+      ctx.fillStyle = 'var(--text-muted)';
+      ctx.fillText('📡 データを収集中...', ctx.canvas.width / 2, ctx.canvas.height / 2 - 15);
+      ctx.font = '14px Inter, Arial, sans-serif';
+      ctx.fillText('しばらくお待ちください', ctx.canvas.width / 2, ctx.canvas.height / 2 + 15);
+    }
     return;
   }
   
@@ -584,13 +1101,19 @@ function renderModalChart(host) {
       datasets: [{
         label: 'RTT (ms)',
         data: data,
-        borderColor: '#667eea',
-        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+        borderColor: 'var(--info-color)',
+        backgroundColor: 'rgba(59, 130, 246, 0.08)',
         fill: true,
-        tension: 0.3,
+        tension: 0.4,
         pointRadius: 3,
-        pointHoverRadius: 6,
-        borderWidth: 3
+        pointHoverRadius: 8,
+        borderWidth: 3,
+        pointBackgroundColor: 'var(--info-color)',
+        pointBorderColor: 'var(--surface-white)',
+        pointBorderWidth: 2,
+        pointHoverBackgroundColor: 'var(--info-color)',
+        pointHoverBorderColor: 'var(--surface-white)',
+        pointHoverBorderWidth: 3
       }]
     },
     options: {
@@ -599,15 +1122,26 @@ function renderModalChart(host) {
       plugins: {
         legend: {
           display: true,
-          position: 'top'
+          position: 'top',
+          labels: {
+            color: 'var(--text-primary)',
+            font: {
+              size: 14,
+              weight: '600'
+            },
+            usePointStyle: true,
+            pointStyle: 'circle'
+          }
         },
         title: {
           display: true,
           text: `RTT履歴 - ${info.name}`,
+          color: 'var(--text-primary)',
           font: {
-            size: 16,
-            weight: 'bold'
-          }
+            size: 18,
+            weight: '600'
+          },
+          padding: 20
         }
       },
       scales: {
@@ -616,31 +1150,55 @@ function renderModalChart(host) {
           title: {
             display: true,
             text: 'RTT (ms)',
+            color: 'var(--text-primary)',
             font: {
-              weight: 'bold'
+              size: 14,
+              weight: '600'
+            }
+          },
+          ticks: {
+            color: 'var(--text-secondary)',
+            font: {
+              size: 12,
+              weight: '500'
             }
           },
           grid: {
-            color: 'rgba(0, 0, 0, 0.1)'
+            color: 'var(--border-subtle)',
+            borderColor: 'var(--border-light)'
           }
         },
         x: {
           title: {
             display: true,
             text: data.length > 10 ? '時刻' : 'データポイント',
+            color: 'var(--text-primary)',
             font: {
-              weight: 'bold'
+              size: 14,
+              weight: '600'
+            }
+          },
+          ticks: {
+            color: 'var(--text-secondary)',
+            font: {
+              size: 12,
+              weight: '500'
             }
           },
           grid: {
-            color: 'rgba(0, 0, 0, 0.1)'
+            color: 'var(--border-subtle)',
+            borderColor: 'var(--border-light)'
           }
         }
       },
       elements: {
         point: {
-          hoverBackgroundColor: '#667eea'
+          hoverBackgroundColor: 'var(--info-color)'
         }
+      },
+      interaction: {
+        intersect: false,
+        mode: 'index'
       }
     }
   });
@@ -706,13 +1264,6 @@ async function fetchStatus() {
     
     const json = await res.json();
     
-    // デバッグ: APIレスポンスの構造を確認
-    console.log('API Response:', json);
-    if (Object.keys(json).length > 0) {
-      const firstHost = Object.keys(json)[0];
-      console.log('Sample host data:', json[firstHost]);
-    }
-    
     const dataChanged = JSON.stringify(statusData) !== JSON.stringify(json);
     
     if (dataChanged || isInitialRender) {
@@ -731,8 +1282,33 @@ async function fetchStatus() {
   }
 }
 
-// 初期化
+// 初期化とデータ更新チェック
 setInterval(fetchStatus, 3000);
+
+// 定期的に表示を更新（データが古くなった場合のメッセージ更新用）
+setInterval(() => {
+  if (Object.keys(statusData).length > 0) {
+    renderTable(); // テーブルの表示を更新
+    
+    // 展開されているチャートも更新
+    expandedRows.forEach(host => {
+      if (charts[host]) {
+        renderChart(host);
+      }
+    });
+    
+    // モーダルが開いている場合はモーダルチャートも更新
+    if (modalChart && document.getElementById('hostModal').classList.contains('show')) {
+      const modalTitle = document.getElementById('modalTitle').textContent;
+      const match = modalTitle.match(/\(([^)]+)\)$/);
+      if (match) {
+        const host = match[1];
+        renderModalChart(host);
+      }
+    }
+  }
+}, 5000); // 5秒ごとに表示を更新
+
 fetchStatus();
 
 // モーダルの外側をクリックした時に閉じる
